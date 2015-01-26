@@ -1,56 +1,40 @@
 package uk.ac.aber.chh57.helloworld;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TabHost;
-import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 import android.location.Location;
 import android.view.View.OnClickListener;
 import android.location.LocationListener;
 import android.location.LocationManager;
-
 import java.io.File;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.widget.ImageView;
-
-
 
 
 public class MainActivity extends Activity  {
 
     File plantFile,sceneFile;
     protected LocationManager locationManager;
-    protected Button GPSBtn;
-    protected Button plantPhotoBtn,scenePhotoBtn;
+    protected Button plantPhotoBtn,scenePhotoBtn, SaveRecordBtn;
     private static final long update_distance = 5; //the distance change before an update(in meters)
     private static final long update_time = 1000 ; //time between updates (in milliseconds)
     public static String userData = "sharedData";
     SharedPreferences runtimeData;
-
     Button saveBtn;
     EditText txtName, txtPhone, txtEmail;
-    TextView nameLbl;
 
 
     @Override
@@ -60,8 +44,6 @@ public class MainActivity extends Activity  {
         setContentView(R.layout.activity_main);
         runtimeData = getSharedPreferences(userData, 0);
         // The below function call finds the user details from the shared preferences, if they exist
-//        runtimeData.edit().clear();
-//        runtimeData.edit().commit();
         checkPrefs();
 
         // The below assigns the fields in the gradle to the program code
@@ -93,11 +75,11 @@ public class MainActivity extends Activity  {
         // *******************************************************************************************************
 
 
-        // *************************** GPS METHOD ***************************************************************
+        // *************************** Save Record METHOD ***************************************************************
         Intent intent=new Intent("android.location.GPS_ENABLED_CHANGE");
         intent.putExtra("enabled", true);
         sendBroadcast(intent);
-        GPSBtn = (Button) findViewById(R.id.btnSave);
+        SaveRecordBtn = (Button) findViewById(R.id.btnSave);
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 
@@ -108,12 +90,14 @@ public class MainActivity extends Activity  {
                 new GPSListener()
         );
 
-        GPSBtn.setOnClickListener(new OnClickListener() {
+        SaveRecordBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
                 showCurrentLocation();
             }
         });
+        SharedPreferences.Editor editor = runtimeData.edit();
+
         // *************************************************************************************************
 
 
@@ -127,7 +111,7 @@ public class MainActivity extends Activity  {
 
             @Override
             public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
-               saveBtn.setEnabled(!txtName.getText().toString().trim().isEmpty());
+               saveBtn.setEnabled((!txtName.getText().toString().trim().isEmpty()) && (!txtPhone.getText().toString().trim().isEmpty()) && (!txtEmail.getText().toString().trim().isEmpty()));
             }
 
             @Override
@@ -146,7 +130,7 @@ public class MainActivity extends Activity  {
                 String phoneNumber = txtPhone.getText().toString();
                 String email = txtEmail.getText().toString();
 
-                SharedPreferences.Editor editor = runtimeData.edit();
+
                 editor.putString("username", userName);
                 editor.putString("phoneNumber", phoneNumber);
                 editor.putString("email", email);
@@ -156,6 +140,9 @@ public class MainActivity extends Activity  {
             }
         });
         // ******************************************************************************************************
+
+        // ******************* Saving Record ****************************************************************
+
 
         // ******************* Photo storage button control **************************************************
         plantPhotoBtn = (Button) findViewById(R.id.btnPlant);
@@ -227,6 +214,10 @@ public class MainActivity extends Activity  {
                     location.getLongitude(), location.getLatitude()
             );
             Toast.makeText(MainActivity.this, message,
+                    Toast.LENGTH_LONG).show();
+        }
+        else {
+            Toast.makeText(MainActivity.this, "Could not find GPS location",
                     Toast.LENGTH_LONG).show();
         }
     }
