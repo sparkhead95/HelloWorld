@@ -2,9 +2,11 @@ package uk.ac.aber.chh57.helloworld;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Menu;
@@ -48,7 +50,8 @@ public class MainActivity extends Activity  {
 
     Button saveBtn;
     EditText txtName, txtPhone, txtEmail;
-    List<Contact> Contacts = new ArrayList<Contact>();
+    TextView nameLbl;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,12 +60,15 @@ public class MainActivity extends Activity  {
         setContentView(R.layout.activity_main);
         runtimeData = getSharedPreferences(userData, 0);
         // The below function call finds the user details from the shared preferences, if they exist
-        //checkPrefs();
+//        runtimeData.edit().clear();
+//        runtimeData.edit().commit();
+        checkPrefs();
 
         // The below assigns the fields in the gradle to the program code
         txtName = (EditText) findViewById(R.id.nametxt);
         txtPhone = (EditText) findViewById(R.id.phonetxt);
         txtEmail = (EditText) findViewById(R.id.emailtxt);
+
         // and assigns the tab host to control which tabs exist
         TabHost tabHost = (TabHost) findViewById(R.id.tabHost);
         // it then initiates the tabs
@@ -88,6 +94,9 @@ public class MainActivity extends Activity  {
 
 
         // *************************** GPS METHOD ***************************************************************
+        Intent intent=new Intent("android.location.GPS_ENABLED_CHANGE");
+        intent.putExtra("enabled", true);
+        sendBroadcast(intent);
         GPSBtn = (Button) findViewById(R.id.btnSave);
 
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -133,16 +142,17 @@ public class MainActivity extends Activity  {
         saveBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                saveContact(txtName.getText().toString(), txtPhone.getText().toString(), txtEmail.getText().toString());
                 String userName = txtName.getText().toString();
                 String phoneNumber = txtPhone.getText().toString();
                 String email = txtEmail.getText().toString();
+
                 SharedPreferences.Editor editor = runtimeData.edit();
                 editor.putString("username", userName);
                 editor.putString("phoneNumber", phoneNumber);
                 editor.putString("email", email);
                 editor.commit();
-                Toast.makeText(getApplicationContext(), "Details for " + txtName.getText().toString() + " have been saved.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(), "Data stored for " + runtimeData.getString("username", "Not Found") + " successfully.", Toast.LENGTH_SHORT).show();
+                //Toast.makeText(getApplicationContext(), "Details for " + txtName.getText().toString() + " have been saved.", Toast.LENGTH_SHORT).show();
             }
         });
         // ******************************************************************************************************
@@ -222,23 +232,21 @@ public class MainActivity extends Activity  {
     }
 
     protected void checkPrefs(){
-        runtimeData = getSharedPreferences(userData, 0);
-        if (runtimeData.getString("username", "NotFound") == "NotFound"){
-
+        txtName = (EditText) findViewById(R.id.nametxt);
+        txtPhone = (EditText) findViewById(R.id.phonetxt);
+        txtEmail = (EditText) findViewById(R.id.emailtxt);
+        runtimeData = getSharedPreferences(userData, Context.MODE_PRIVATE);
+        String existingUsername = runtimeData.getString("username", null);
+        String existingPhone = runtimeData.getString("phoneNumber", null);
+        String existingEmail = runtimeData.getString("email", null);
+        if (existingUsername != null)  {
+            txtName.setText(existingUsername);
+            txtPhone.setText(existingPhone);
+            txtEmail.setText(existingEmail);
         }
-        else {
-            if (runtimeData.getString("username", "Not Found") != null){
-                txtName.setText(runtimeData.getString("username", "Not Found"));
-                txtPhone.setText(runtimeData.getString("phoneNumber", "Not Found"));
-                txtEmail.setText(runtimeData.getString("email", "Not Found"));
-            }
-            else{
-                Toast.makeText(getApplicationContext(), "This sharedpreference is empty.", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-
     }
+
+
 
     private class GPSListener implements LocationListener {
 
@@ -268,36 +276,6 @@ public class MainActivity extends Activity  {
         }
 
     }
-
-    private void saveContact(String name, String email, String phone){
-        Contacts.add(new Contact(name, email, phone));
-    }
-
-
-        private class ContactListAdapter extends ArrayAdapter<Contact> {
-        public ContactListAdapter(){
-            super (MainActivity.this, R.layout.listview_item, Contacts);
-        }
-
-        @Override
-        public View getView(int position, View view, ViewGroup parent){
-            if (view == null){
-                view = getLayoutInflater().inflate(R.layout.listview_item, parent, false);
-            }
-            Contact thisContact = Contacts.get(position);
-
-            TextView name = (TextView) view.findViewById(R.id.contactName);
-            name.setText(thisContact.getName());
-            TextView phone = (TextView) view.findViewById(R.id.Phone);
-            phone.setText(thisContact.getPhone());
-            TextView email = (TextView) view.findViewById(R.id.Email);
-            email.setText(thisContact.getEmail());
-            return view;
-        }
-
-    }
-
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
