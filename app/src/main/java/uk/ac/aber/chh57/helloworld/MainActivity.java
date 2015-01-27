@@ -2,16 +2,22 @@ package uk.ac.aber.chh57.helloworld;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TabHost;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
 import android.location.Location;
@@ -19,10 +25,10 @@ import android.view.View.OnClickListener;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import java.io.File;
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import android.content.Intent;
-
 
 public class MainActivity extends Activity  {
 
@@ -31,26 +37,35 @@ public class MainActivity extends Activity  {
     protected Button plantPhotoBtn,scenePhotoBtn, SaveRecordBtn;
     private static final long update_distance = 5; //the distance change before an update(in meters)
     private static final long update_time = 1000 ; //time between updates (in milliseconds)
+    private static int saveClicked = 0;
     public static String userData = "sharedData";
-    SharedPreferences runtimeData;
-    Button saveBtn;
-    EditText txtName, txtPhone, txtEmail;
-
+    SharedPreferences userSettingsData, recordData;
+    Button saveBtn, updateReserveBtn;
+    EditText txtName, txtPhone, txtEmail, speciesTxt, commentsTxt;
+    Spinner abundanceTxt, siteSpinner;
+    TextView siteDetailsLbl;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         // *********************** pre-tab creation *******************************************************
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        runtimeData = getSharedPreferences(userData, 0);
+        userSettingsData = getSharedPreferences(userData, 0);
+        recordData = getSharedPreferences(userData, 0);
         // The below function call finds the user details from the shared preferences, if they exist
         checkPrefs();
-
         // The below assigns the fields in the gradle to the program code
+        saveClicked = 0;
+        saveBtn = (Button) findViewById(R.id.btnSaveSettings);
+        updateReserveBtn = (Button) findViewById(R.id.btnUpdateReserves);
         txtName = (EditText) findViewById(R.id.nametxt);
         txtPhone = (EditText) findViewById(R.id.phonetxt);
         txtEmail = (EditText) findViewById(R.id.emailtxt);
-
+        speciesTxt = (EditText) findViewById(R.id.txtSpecies);
+        commentsTxt = (EditText) findViewById(R.id.txtComments);
+        abundanceTxt = (Spinner) findViewById(R.id.txtAbundance);
+        siteSpinner = (Spinner) findViewById(R.id.txtSite);
+        siteDetailsLbl = (TextView) findViewById(R.id.lblSiteDetails);
         // and assigns the tab host to control which tabs exist
         TabHost tabHost = (TabHost) findViewById(R.id.tabHost);
         // it then initiates the tabs
@@ -74,77 +89,48 @@ public class MainActivity extends Activity  {
         tabHost.addTab(tabSpec);
         // *******************************************************************************************************
 
+        // ************************** Populate abundance drop down list *****************************************
+        Spinner dropdown = (Spinner)findViewById(R.id.txtAbundance);
+        String[] abundance = new String[]{"Dominant", "Abundant", "Frequent", "Occasional", "Rare"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, abundance);
+        dropdown.setAdapter(adapter);
+        // **********************************************************************************************************
 
-        // *************************** Save Record METHOD ***************************************************************
-        Intent intent=new Intent("android.location.GPS_ENABLED_CHANGE");
-        intent.putExtra("enabled", true);
-        sendBroadcast(intent);
-        SaveRecordBtn = (Button) findViewById(R.id.btnSave);
-
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-
-        locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                update_time,
-                update_distance,
-                new GPSListener()
-        );
-
-        SaveRecordBtn.setOnClickListener(new OnClickListener() {
+        // ************************ Update Reserves button ************************************************************
+        updateReserveBtn.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                showCurrentLocation();
+                getReserves();
             }
         });
-        SharedPreferences.Editor editor = runtimeData.edit();
+        // *************************************************************************************************************
 
+        // *************************** Update reserves spinner ******************************************************************
+        Spinner dropdownReserves = (Spinner)findViewById(R.id.txtSite);
+        String[] reserves = new String[]{"Aberbargoed Grasslands", "Allt Rhyd y Groes", "Allt y Benglog", "Anglesey Fens", "Bardsey Island"};
+        ArrayAdapter<String> adapterReserves = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, reserves);
+        dropdownReserves.setAdapter(adapterReserves);
+        // *************************************************************************************************************
+
+        // *************************** Save Record method ***************************************************************
+        saveRecord();
         // *************************************************************************************************
 
+        // **************************** Validation *********************************************************
+        validation();
+        // ***********************************************************************************************
 
-        // **************************************************************************************************
-        // The following is for actions based on text changing within the WHOLE app- this main class doesn't see tabs; it only views the ID's.
-        txtName.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {
-
-            }
-
-            @Override
-            public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
-               saveBtn.setEnabled((!txtName.getText().toString().trim().isEmpty()) && (!txtPhone.getText().toString().trim().isEmpty()) && (!txtEmail.getText().toString().trim().isEmpty()));
-            }
-
-            @Override
-            public void afterTextChanged(Editable editable) {
-
-            }
-        });
-        // **************************************************************************************************
 
         // ***************************** Saving user settings *********************************************
-        saveBtn = (Button) findViewById(R.id.btnSaveSettings);
-        saveBtn.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                String userName = txtName.getText().toString();
-                String phoneNumber = txtPhone.getText().toString();
-                String email = txtEmail.getText().toString();
-
-
-                editor.putString("username", userName);
-                editor.putString("phoneNumber", phoneNumber);
-                editor.putString("email", email);
-                editor.commit();
-                Toast.makeText(getApplicationContext(), "Data stored for " + runtimeData.getString("username", "Not Found") + " successfully.", Toast.LENGTH_SHORT).show();
-                //Toast.makeText(getApplicationContext(), "Details for " + txtName.getText().toString() + " have been saved.", Toast.LENGTH_SHORT).show();
-            }
-        });
+        saveUserSettings();
         // ******************************************************************************************************
 
-        // ******************* Saving Record ****************************************************************
-
-
         // ******************* Photo storage button control **************************************************
+        storePhoto();
+        // ******************************************************************************************************
+    }
+
+    protected void storePhoto(){
         plantPhotoBtn = (Button) findViewById(R.id.btnPlant);
         scenePhotoBtn = (Button) findViewById(R.id.btnScene);
 
@@ -153,8 +139,12 @@ public class MainActivity extends Activity  {
             public void onClick(View v) {
                 Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 //Get the name from the setPhotoFile() function
-                plantFile = setPhotoFile(0);
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, plantFile);
+                try {
+                    plantFile = setPhotoFile(0);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(plantFile));
                 startActivityForResult(intent, 0);
 
             }
@@ -164,13 +154,22 @@ public class MainActivity extends Activity  {
             public void onClick(View v) {
                 Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
                 //Get the name from the setPhotoFile() function
-                sceneFile = setPhotoFile(1);
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, sceneFile);
+                try {
+                    sceneFile = setPhotoFile(1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                intent.putExtra(MediaStore.EXTRA_OUTPUT,  Uri.fromFile(sceneFile));
                 startActivityForResult(intent, 0);
 
             }
         });
-        // ******************************************************************************************************
+
+    }
+
+
+    protected void getReserves(){
+        Toast.makeText(this, "Could not retrieve reserves.", Toast.LENGTH_LONG).show();
     }
 
 
@@ -190,22 +189,189 @@ public class MainActivity extends Activity  {
         }
     }
 
-    private File setPhotoFile(int x){
+    protected void saveUserSettings(){
+        saveBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String userName = txtName.getText().toString();
+                String phoneNumber = txtPhone.getText().toString();
+                String email = txtEmail.getText().toString();
+                SharedPreferences.Editor editor = userSettingsData.edit();
+                editor.putString("username", userName);
+                editor.putString("phoneNumber", phoneNumber);
+                editor.putString("email", email);
+                editor.commit();
+                Toast.makeText(getApplicationContext(), "Data stored for " + userSettingsData.getString("username", "Not Found") + " successfully.", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    protected void validation(){
+        txtName.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+                if (validateUser() == true){
+                    saveBtn.setEnabled(true);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+
+            }
+        });
+
+        txtEmail.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+                if (validateUser() == true){
+                    saveBtn.setEnabled(true);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+
+            }
+        });
+
+        txtPhone.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+                if (validateUser() == true){
+                    saveBtn.setEnabled(true);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+
+            }
+        });
+    }
+
+    protected void saveRecord(){
+        Intent intent=new Intent("android.location.GPS_ENABLED_CHANGE");
+        intent.putExtra("enabled", true);
+        //sendBroadcast(intent);
+        SaveRecordBtn = (Button) findViewById(R.id.btnSave);
+
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+        locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                update_time,
+                update_distance,
+                new GPSListener()
+        );
+        speciesTxt.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+
+            }
+
+            @Override
+            public void onTextChanged(CharSequence charSequence, int i, int i2, int i3) {
+                SaveRecordBtn.setEnabled(!((!speciesTxt.getText().toString().trim().isEmpty()) && (!commentsTxt.getText().toString().trim().isEmpty()) && (!abundanceTxt.toString().trim().isEmpty())));
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+
+            }
+        });
+        SaveRecordBtn.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                saveClicked = saveClicked + 1;
+                // GPS
+                showCurrentLocation();
+                // -------------------
+                // Shared prefs
+                String species = speciesTxt.getText().toString();
+                String comments = commentsTxt.getText().toString();
+                String abundance = abundanceTxt.toString();
+                SharedPreferences.Editor editor = recordData.edit();
+                editor.putString("species", species);
+                editor.putString("comments", comments);
+                editor.putString("abundance", abundance);
+                editor.commit();
+                // ------------------
+                // OO
+                try {
+
+                    Record i = new Record();
+                    i.setPlantName(species);
+                    i.setComments(comments);
+                    i.setAbundance(abundance);
+                    i.setReserveViewed(siteSpinner.toString());
+                    i.setPlantPhotoPath(plantFile.getPath().toString());
+                    i.setScenePhotoPath(sceneFile.getPath().toString());
+                }
+                catch (Exception e){
+                    System.out.println("No plant/scene found.");
+                }
+                // ----------------------
+                Toast.makeText(getApplicationContext(), "Data stored for " + userSettingsData.getString("species", "Not Found") + " successfully.", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+
+    }
+
+    private File setPhotoFile(int x) throws IOException {
         String type = null;
         if (x==0){
-        //if it's plant
+            //if it's plant
             type = "Species";
         }else if (x==1){
-        //if it's scene
+            //if it's scene
             type = "Scene";
         }
+        //Make a time stamp and add the type e.g. scene or species
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        return new File( "IMG_" + type + timeStamp + ".jpg");//directory.getPath() + File.separator +
+        String imageFileName = type + timeStamp;
+        //Find the default storage directory
+        File storageDir = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES);
+
+        File image = File.createTempFile(imageFileName, ".jpg",storageDir);
+
+        return image;
+    }
+
+    protected boolean validateUser(){
+        if (!((txtName.getText().toString().isEmpty()) && ((txtPhone.getText().toString().isEmpty())) && ((txtEmail.getText().toString().isEmpty())))){
+            return true;
+        }
+        else return false;
     }
 
 
     protected void showCurrentLocation(){
+        LocationManager gpsService = (LocationManager) getSystemService(LOCATION_SERVICE);
+        boolean enabled = gpsService
+                .isProviderEnabled(LocationManager.GPS_PROVIDER);
 
+        if (!enabled) {
+            Intent intent = new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS);
+            startActivity(intent);
+        }
         Location location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
 
         if (location != null) {
@@ -226,10 +392,10 @@ public class MainActivity extends Activity  {
         txtName = (EditText) findViewById(R.id.nametxt);
         txtPhone = (EditText) findViewById(R.id.phonetxt);
         txtEmail = (EditText) findViewById(R.id.emailtxt);
-        runtimeData = getSharedPreferences(userData, Context.MODE_PRIVATE);
-        String existingUsername = runtimeData.getString("username", null);
-        String existingPhone = runtimeData.getString("phoneNumber", null);
-        String existingEmail = runtimeData.getString("email", null);
+        userSettingsData = getSharedPreferences(userData, Context.MODE_PRIVATE);
+        String existingUsername = userSettingsData.getString("username", null);
+        String existingPhone = userSettingsData.getString("phoneNumber", null);
+        String existingEmail = userSettingsData.getString("email", null);
         if (existingUsername != null)  {
             txtName.setText(existingUsername);
             txtPhone.setText(existingPhone);
@@ -242,11 +408,11 @@ public class MainActivity extends Activity  {
     private class GPSListener implements LocationListener {
 
         public void onLocationChanged(Location location) {
-            String message = String.format(
-                    "GPS Location saved",
-                    location.getLongitude(), location.getLatitude()
-            );
-            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+//            String message = String.format(
+//                    "GPS Location saved",
+//                    location.getLongitude(), location.getLatitude()
+//            );
+//            Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
         }
 
         public void onStatusChanged(String s, int i, Bundle b) {
@@ -267,6 +433,7 @@ public class MainActivity extends Activity  {
         }
 
     }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
